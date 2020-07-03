@@ -29,6 +29,10 @@ impl Document {
         let vec: Vec<&str> = selector.split('@').collect();
 
         match vec.as_slice() {
+            [query, "html"] => match self.element(query) {
+                Some(el) => el.html(),
+                None => String::new(),
+            },
             [query, attr] => match self.element(query) {
                 Some(el) => match el.value().attr(attr) {
                     Some(v) => v.into(),
@@ -42,6 +46,10 @@ impl Document {
             },
             _ => String::new(),
         }
+    }
+
+    pub fn query_scoped(&self, jsonstr: &str) -> String {
+        return String::new();
     }
 }
 
