@@ -1,5 +1,16 @@
-use scraper::{Html, Selector};
+use scraper::{ElementRef, Html, Selector};
+use std::fmt::Debug;
 use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
+}
+
+fn dbg(arg: &impl Debug) {
+    log(&format!("{:?}", arg));
+}
 
 #[wasm_bindgen]
 pub struct Document {
@@ -8,18 +19,29 @@ pub struct Document {
 
 #[wasm_bindgen]
 impl Document {
-    pub fn attr(&self, query: &str, attr: &str) -> String {
-        let mut r = vec![];
-
-        if let Ok(selector) = Selector::parse(query) {
-            for element in self.doc.select(&selector) {
-                if let Some(v) = element.value().attr(attr) {
-                    r.push(v);
-                }
-            }
+    fn element(&self, query: &str) -> Option<ElementRef> {
+        match Selector::parse(query) {
+            Ok(selector) => self.doc.select(&selector).next(),
+            _ => None,
         }
+    }
+    pub fn query_selector(&self, selector: &str) -> String {
+        let vec: Vec<&str> = selector.split('@').collect();
 
-        r.join(";")
+        match vec.as_slice() {
+            [query, attr] => match self.element(query) {
+                Some(el) => match el.value().attr(attr) {
+                    Some(v) => v.into(),
+                    None => String::new(),
+                },
+                None => String::new(),
+            },
+            [query] => match self.element(query) {
+                Some(el) => el.inner_html(),
+                None => String::new(),
+            },
+            _ => String::new(),
+        }
     }
 }
 
@@ -27,12 +49,5 @@ impl Document {
 pub fn parse_document(html: &str) -> Document {
     Document {
         doc: Html::parse_document(html),
-    }
-}
-
-#[wasm_bindgen]
-pub fn parse_fragment(html: &str) -> Document {
-    Document {
-        doc: Html::parse_fragment(html),
     }
 }

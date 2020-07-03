@@ -1,19 +1,42 @@
 import {
     parse_document,
-    parse_fragment
 } from "./pkg/deno.js";
+import {
+    assertEquals,
+    assertArrayContains,
+} from "https://deno.land/std/testing/asserts.ts";
 
-let d = parse_document(`
+
+function x(html: string, selector: string) {
+    const d = parse_document(html); 
+    const result = d.query_selector(selector);
+    d.free();
+    return result;
+}
+
+
+const HTML_1 = `
 <!DOCTYPE html>
 <meta charset="utf-8">
 <title>Hello, world!</title>
-<h1 class="foo">Hello, <i>world!</i></h1>
-`); 
-// remember to free
-d.free();
+<h1 class="content">Hello, <i>world!</i></h1>
+<a href="http://google.com">google</a>
+`;
 
+Deno.test("select by element name", () => {
+    const title = x(HTML_1, 'title');
 
-let f = parse_fragment(`<input name="foo" value="bar">`);
-let r = f.attr(`input[name="foo"]`, 'value');
+    assertEquals(title, 'Hello, world!');
+});
 
-console.log(r);
+Deno.test("select by class name", () => {
+    const content = x(HTML_1, '.content');
+
+    assertEquals(content, 'Hello, <i>world!</i>');
+});
+
+Deno.test("select an attribute", () => {
+    const content = x(HTML_1, 'a@href');
+
+    assertEquals(content, 'http://google.com');
+});
