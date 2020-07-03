@@ -1,4 +1,5 @@
 use scraper::{ElementRef, Html, Selector};
+use serde_json::{self, Map, Result, Value};
 use std::fmt::Debug;
 use wasm_bindgen::prelude::*;
 
@@ -16,40 +17,56 @@ fn dbg(arg: &impl Debug) {
 pub struct Document {
     doc: scraper::html::Html,
 }
+fn query_str(elem: &ElementRef, selector: &str) -> Value {
+    let vec: Vec<&str> = selector.split('@').collect();
+
+    match vec.as_slice() {
+        [query, "html"] => Selector::parse(query)
+            .ok()
+            .map(|s| elem.select(&s).map(|e| e.html()).collect::<Vec<_>>())
+            .map(|e| e.into())
+            .unwrap_or_default(),
+        [query, attr] => Selector::parse(query)
+            .ok()
+            .map(|s| {
+                elem.select(&s)
+                    .filter_map(|e| e.value().attr(attr))
+                    .collect::<Vec<_>>()
+            })
+            .map(|s| s.into())
+            .unwrap_or_default(),
+        [query] => Selector::parse(query)
+            .ok()
+            .map(|s| elem.select(&s).map(|e| e.inner_html()).collect::<Vec<_>>())
+            .map(|s| s.into())
+            .unwrap_or_default(),
+        _ => Default::default(),
+    }
+}
+
+fn query_arr(elem: &ElementRef, values: &Vec<Value>) -> Value {
+    values
+        .iter()
+        .filter_map(|v| match &v {
+            Value::String(s) => Some(query_str(elem, &s)),
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .into()
+}
 
 #[wasm_bindgen]
 impl Document {
-    fn element(&self, query: &str) -> Option<ElementRef> {
-        match Selector::parse(query) {
-            Ok(selector) => self.doc.select(&selector).next(),
-            _ => None,
+    pub fn query(&self, jsonstr: &str) -> String {
+        let mut result: Value = Default::default();
+        if let Ok(value) = serde_json::from_str::<Value>(jsonstr) {
+            result = match value {
+                Value::String(str) => query_str(&self.doc.root_element(), &str),
+                Value::Array(arr) => query_arr(&self.doc.root_element(), &arr),
+                _ => Default::default(),
+            };
         }
-    }
-    pub fn query_selector(&self, selector: &str) -> String {
-        let vec: Vec<&str> = selector.split('@').collect();
-
-        match vec.as_slice() {
-            [query, "html"] => match self.element(query) {
-                Some(el) => el.html(),
-                None => String::new(),
-            },
-            [query, attr] => match self.element(query) {
-                Some(el) => match el.value().attr(attr) {
-                    Some(v) => v.into(),
-                    None => String::new(),
-                },
-                None => String::new(),
-            },
-            [query] => match self.element(query) {
-                Some(el) => el.inner_html(),
-                None => String::new(),
-            },
-            _ => String::new(),
-        }
-    }
-
-    pub fn query_scoped(&self, jsonstr: &str) -> String {
-        return String::new();
+        return serde_json::to_string(&result).unwrap();
     }
 }
 

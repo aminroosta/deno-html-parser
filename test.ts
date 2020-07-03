@@ -7,15 +7,22 @@ import {
 } from "https://deno.land/std/testing/asserts.ts";
 
 
-function x(html: string, selector: string | object) {
+function x(html: string, selector: string | object | Array<any>) {
     const d = parse_document(html); 
-    let result;
-    if(typeof selector === 'string') {
-        result = d.query_selector(selector);
-    } else {
-        result = d.query_scoped(JSON.stringify(selector));
-        result = result && JSON.parse(result);
-    }
+    let result = JSON.parse(
+        d.query(JSON.stringify(selector))
+    );
+
+    // let result;
+    // if(typeof selector === 'string') {
+    //     result = d.query_selector(selector);
+    // } else if(Array.isArray(selector)) {
+    //     result = d.query_selector_all(JSON.stringify(selector));
+
+    // } else {
+    //     result = d.query_scoped(JSON.stringify(selector));
+    //     result = result && JSON.parse(result);
+    // }
     d.free();
     return result;
 }
@@ -34,59 +41,71 @@ const HTML_1 = `
 <h1 class="content">Hello, <i>world!</i></h1>
 <a href="http://google.com">google</a>
 <ul>
-    <li class=".item">
-        <p>one<p>
-        <b>ONE<b>
+    <li class="item">
+        <div>one</div>
+        <strong>ONE</strong>
     </li>
-    <li class=".item">
-        <p>two<p>
-        <b>TWO<b>
+    <li class="item">
+        <div>two</div>
+        <strong>TWO</strong>
     </li>
 </ul>
 `;
 
-Deno.test("select by element name", () => {
-    const title = x(HTML_1, 'title');
+Deno.test('tag name', () =>
+  assertEquals(
+    x(HTML_1, 'title'),
+    ['Hello, world!'],
+  ));
 
-    assertEquals(title, 'Hello, world!');
-});
+Deno.test('outer html', () =>
+  assertEquals(
+    x(HTML_1, 'title@html'),
+    ['<title>Hello, world!</title>']
+  ));
 
-Deno.test("select outer html", () => {
-    const content = x(HTML_1, 'title@html');
+Deno.test('class name', () =>
+  assertEquals(
+    x(HTML_1, '.content i'),
+    ['world!']
+  ));
 
-    assertEquals(content, '<title>Hello, world!</title>');
-});
+Deno.test("attribute", () =>
+  assertEquals(
+    x(HTML_1, "a@href"),
+    ["http://google.com"],
+  ));
 
-Deno.test("select by class name", () => {
-    const content = x(HTML_1, '.content i');
+Deno.test("attribute", () =>
+  assertEquals(
+    x(HTML_1, ["ul li div", "ul li strong"]),
+    [["one", "two"], ["ONE", "TWO"]],
+  ));
 
-    assertEquals(content, 'world!');
-});
+// Deno.test("scoping selection", () => {
+//     const content = x(HTML_1, {
+//         title: 'title',
+//         li_list: ['.item'],
+//         li_inner: [{
+//             p: '.item p',
+//             b: '.item b'
+//         }]
 
-Deno.test("select an attribute", () => {
-    const content = x(HTML_1, 'a@href');
+//         items: x.x('item', [
+//             {
+//                 p: 'p',
+//                 b: 'b'
+//             }
+//         ])
+//     });
 
-    assertEquals(content, 'http://google.com');
-});
-
-Deno.test("scoping selection", () => {
-    const content = x(HTML_1, {
-        title: 'title',
-        items: x.x('item', [
-            {
-                p: 'p',
-                b: 'b'
-            }
-        ])
-    });
-
-    assertEquals(content, {
-        title: 'Hello, world!',
-        items: [
-            {p: 'one', b: 'ONE'},
-            {p: 'two', b: 'TWO'},
-        ]
-    });
-});
+//     assertEquals(content, {
+//         title: 'Hello, world!',
+//         items: [
+//             {p: 'one', b: 'ONE'},
+//             {p: 'two', b: 'TWO'},
+//         ]
+//     });
+// });
 
 
